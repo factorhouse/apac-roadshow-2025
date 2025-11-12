@@ -170,7 +170,11 @@ INSERT INTO customers (customer_id, email, first_name, last_name, phone, city, s
 -- PUBLICATION FOR CDC
 -- ============================================
 -- Create a publication for all tables (Flink CDC will subscribe to this)
-CREATE PUBLICATION workshop_cdc FOR ALL TABLES;
+--  The user must be a superuser
+-- CREATE PUBLICATION workshop_cdc FOR ALL TABLES;
+
+-- Create a publication for the specific tables required by the Flink CDC jobs.
+CREATE PUBLICATION workshop_cdc FOR TABLE products, customers, orders, order_items, inventory, product_views;
 
 -- ============================================
 -- INDEXES FOR PERFORMANCE

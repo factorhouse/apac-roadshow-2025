@@ -1,4 +1,6 @@
+# Custom
 .ignore
+.vscode
 
 # Licensse files
 license-kpow.env

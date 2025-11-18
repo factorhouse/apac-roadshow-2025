@@ -8,12 +8,11 @@
 
 set -e
 
-echo "🚀 Starting ENHANCED Inventory Management Job (WITH ORDER DEDUCTION)..."
-
 # Load and Print Environment Configuration from .env file
 source env.sh
 load_and_print_env
 
+echo "🚀 Starting ENHANCED Inventory Management Job (WITH ORDER DEDUCTION)..."
 echo ""
 echo "🆕 This job includes ORDER DEDUCTION:"
 echo "   - Listens to order-events topic"

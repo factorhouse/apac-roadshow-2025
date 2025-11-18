@@ -90,7 +90,7 @@ services:
       ENVIRONMENT_NAME: "Local Redpands Cluster"
       BOOTSTRAP: ${KAFKA_BOOTSTRAP_SERVERS_DOCKER}
     env_file:
-      - ${KPOW_LICENSE:-license-kpow.env}
+      - ${FACTOR_HOUSE_CE_LICENSE:-license.env}
 
   flex:
     image: factorhouse/flex-ce:latest
@@ -110,7 +110,7 @@ services:
       ALLOW_FLINK_JAR_DELETE: "true"
       ALLOW_FLINK_JOB_EDIT: "true"
     env_file:
-      - ${FLEX_LICENSE:-license-flex.env}
+      - ${FACTOR_HOUSE_CE_LICENSE:-license.env}
 
   jobmanager:
     image: flink:1.20.1

@@ -1,8 +1,11 @@
 # HTTP Port Configuration
 quarkus.http.port=8081
 
-# Connection Details
-kafka.bootstrap.servers=${KAFKA_BOOTSTRAP_SERVERS}
+# Disable Quarkus Dev Services for Kafka, since we are using a remote cluster.
+quarkus.kafka.devservices.enabled=false
+
+# Connection Details (from environment variables)
+kafka.bootstrap.servers=${KAFAKA_BOOTSTRAP_SERVERS}
 
 postgres.host=${POSTGRES_HOST}
 postgres.port=${POSTGRES_PORT}
@@ -11,67 +14,54 @@ postgres.username=${POSTGRES_USER}
 postgres.password=${POSTGRES_PASSWORD}
 postgres.jdbc.url=jdbc:postgresql://${postgres.host}:${postgres.port}/${postgres.db}
 
-# Dev Services Configuration - Disabled since Redpanda is already running
-%dev.quarkus.kafka.devservices.enabled=false
-%dev.quarkus.kafka.devservices.image-name=docker.redpanda.com/redpandadata/redpanda:v24.2.4
-%dev.quarkus.kafka.devservices.port=19092
-%dev.quarkus.kafka.devservices.topic-partitions.ecommerce_events=3
-%dev.quarkus.kafka.devservices.topic-partitions.ecommerce_processing_fanout=3
-%dev.quarkus.kafka.devservices.topic-partitions.products=3
-%dev.quarkus.kafka.devservices.topic-partitions.order_events=3
-%dev.quarkus.kafka.devservices.topic-partitions.inventory_updates=3
-%dev.quarkus.kafka.devservices.topic-partitions.websocket_fanout=3
-%dev.quarkus.kafka.devservices.topic-partitions.processing_fanout=3
-%dev.quarkus.kafka.devservices.topic-partitions.shopping-assistant-chat=3
-%dev.quarkus.kafka.devservices.topic-partitions.assistant-responses=3
-
-# Production mode - use external Redpanda
-%prod.quarkus.kafka.devservices.enabled=false
-mp.messaging.outgoing.websocket_fanout.bootstrap.servers=${kafka.bootstrap.servers}
-mp.messaging.outgoing.websocket_fanout.connector=smallrye-kafka
-mp.messaging.outgoing.websocket_fanout.topic=websocket_fanout
-mp.messaging.incoming.processing_fanout.bootstrap.servers=${kafka.bootstrap.servers}
-mp.messaging.incoming.processing_fanout.connector=smallrye-kafka
-mp.messaging.incoming.processing_fanout.topic=processing_fanout
-mp.messaging.incoming.processing_fanout.group.id=quarkus-api-consumer
-# Configure the Kafka Streams application
-quarkus.kafka-streams.bootstrap-servers=${kafka.bootstrap.servers}
-quarkus.kafka-streams.topics=processing_fanout
-quarkus.kafka-streams.application-id=quarkus-ks-consumer
-#quarkus.kafka-streams.consumer.session.timeout.ms=250
-quarkus.kafka-streams.consumer.heartbeat.interval.ms=200
-quarkus.kafka-streams.caching.chat=10
-quarkus.kafka-streams.caching.data-points=150
-
-# E-commerce Kafka Configuration (Redpanda)
-mp.messaging.outgoing.ecommerce_events.bootstrap.servers=${kafka.bootstrap.servers}
+# ===================================================================
+#  Reactive Messaging Channels (SmallRye)
+#     These channels will AUTOMATICALLY inherit the default kafka.*
+#     configuration above. No need to repeat security properties.
+# ===================================================================
 mp.messaging.outgoing.ecommerce_events.connector=smallrye-kafka
 mp.messaging.outgoing.ecommerce_events.topic=ecommerce_events
-mp.messaging.incoming.ecommerce_processing_fanout.bootstrap.servers=${kafka.bootstrap.servers}
+
 mp.messaging.incoming.ecommerce_processing_fanout.connector=smallrye-kafka
 mp.messaging.incoming.ecommerce_processing_fanout.topic=ecommerce_processing_fanout
 mp.messaging.incoming.ecommerce_processing_fanout.group.id=quarkus-ecommerce-consumer
 
-# Order Events for Inventory Deduction
-mp.messaging.outgoing.order_events.bootstrap.servers=${kafka.bootstrap.servers}
 mp.messaging.outgoing.order_events.connector=smallrye-kafka
 mp.messaging.outgoing.order_events.topic=order-events
 
-# Products topic consumer (from inventory job)
-mp.messaging.incoming.products-in.bootstrap.servers=${kafka.bootstrap.servers}
 mp.messaging.incoming.products-in.connector=smallrye-kafka
 mp.messaging.incoming.products-in.topic=products
 mp.messaging.incoming.products-in.group.id=quarkus-products-consumer
 mp.messaging.incoming.products-in.auto.offset.reset=earliest
 
-# Shopping Assistant Kafka Configuration
-mp.messaging.outgoing.shopping-assistant-chat.bootstrap.servers=${kafka.bootstrap.servers}
+mp.messaging.outgoing.websocket_fanout.connector=smallrye-kafka
+mp.messaging.outgoing.websocket_fanout.topic=websocket_fanout
+
+mp.messaging.incoming.processing_fanout.connector=smallrye-kafka
+mp.messaging.incoming.processing_fanout.topic=processing_fanout
+mp.messaging.incoming.processing_fanout.group.id=quarkus-api-consumer
+
 mp.messaging.outgoing.shopping-assistant-chat.connector=smallrye-kafka
 mp.messaging.outgoing.shopping-assistant-chat.topic=shopping-assistant-chat
-mp.messaging.incoming.assistant-responses.bootstrap.servers=${kafka.bootstrap.servers}
+
 mp.messaging.incoming.assistant-responses.connector=smallrye-kafka
 mp.messaging.incoming.assistant-responses.topic=assistant-responses
 mp.messaging.incoming.assistant-responses.group.id=quarkus-assistant-consumer
+
+mp.messaging.incoming.product-recommendations.connector=smallrye-kafka
+mp.messaging.incoming.product-recommendations.topic=product-recommendations
+mp.messaging.incoming.product-recommendations.group.id=quarkus-api
+
+# ===================================================================
+#  Kafka Streams Configuration
+#     We explicitly set the bootstrap servers here. The security
+#     properties will be inherited from the default kafka.* config.
+# ===================================================================
+quarkus.kafka-streams.bootstrap-servers=${kafka.bootstrap.servers}
+quarkus.kafka-streams.topics=processing_fanout
+quarkus.kafka-streams.application-id=quarkus-ks-consumer
+quarkus.kafka-streams.caching.chat=10
+quarkus.kafka-streams.caching.data-points=150
 
 # CORS Configuration
 quarkus.http.cors=true

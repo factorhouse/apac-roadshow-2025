@@ -2,9 +2,8 @@
 .ignore
 .vscode
 
-# Licensse files
-license-kpow.env
-license-flex.env
+# License file
+license.env
 
 # Compiled class file
 *.class

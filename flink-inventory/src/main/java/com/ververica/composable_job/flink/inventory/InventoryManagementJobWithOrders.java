@@ -173,6 +173,7 @@ public class InventoryManagementJobWithOrders {
             .setGroupId(config.getKafkaGroupId())
             .setStartingOffsets(OffsetsInitializer.latest())
             .setValueOnlyDeserializer(new SimpleStringSchema())
+            .setProperties(config.getKafkaPropertiesAsProperties())
             .build();
 
         DataStream<String> rawOrderStream = env.fromSource(

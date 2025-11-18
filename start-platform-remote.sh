@@ -95,7 +95,7 @@ echo ""
 ## INIT DB
 
 echo -e "${YELLOW}Starting Kpow, Flex, and Flink...${NC}"
-docker compose -f compose-managed.yml up -d kpow flex jobmanager taskmanager
+docker compose -f compose-remote.yml up -d kpow flex jobmanager taskmanager
 
 # ==============================================================================
 # Step 3: Create Kafka Topics
@@ -220,7 +220,7 @@ cleanup() {
     echo ""
     echo -e "${YELLOW}Shutting down platform...${NC}"
     kill $QUARKUS_PID 2>/dev/null || true
-    docker compose -f compose-managed.yml down
+    docker compose -f compose-remote.yml down
     rm -rf .pids
     echo -e "${GREEN}Platform stopped${NC}"
     exit 0

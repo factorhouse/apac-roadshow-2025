@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletionStage;
 
 @Path("/api/ecommerce")
 @Produces(MediaType.APPLICATION_JSON)
@@ -282,7 +283,10 @@ public class EcommerceResource {
         // Send order event to Kafka for immediate feedback (optional - CDC will also send)
         try {
             ProcessingEvent<Order> orderEvent = ProcessingEvent.ofOrder(order);
-            eventEmitter.send(MAPPER.writeValueAsString(orderEvent));
+            // eventEmitter.send(MAPPER.writeValueAsString(orderEvent));
+            // Wait for the eventEmitter send to complete
+            CompletionStage<Void> ack = eventEmitter.send(MAPPER.writeValueAsString(orderEvent));
+            ack.toCompletableFuture().join();
         } catch (Exception e) {
             Log.error("Failed to send order event", e);
         }
@@ -303,9 +307,11 @@ public class EcommerceResource {
                     orderItemEvent.put("timestamp", System.currentTimeMillis());
 
                     String json = MAPPER.writeValueAsString(orderItemEvent);
-                    orderEventEmitter.send(json);
+                    // orderEventEmitter.send(json);
+                    // Wait for the orderEventEmitter send to complete
+                    CompletionStage<Void> ack = orderEventEmitter.send(json);
+                    ack.toCompletableFuture().join();
                     Log.infof("    📦 SUCCESSFULLY PUBLISHED order item for inventory deduction: %s x%d", item.productId, item.quantity);
-                    // Log.infof("📦 Published order item for inventory deduction: %s x%d", item.productId, item.quantity);
                 }
             } catch (Exception e) {
                 Log.error("  ❌ CHECKOUT FAILED: Failed to publish order items to Kafka!", e);

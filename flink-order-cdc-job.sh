@@ -12,16 +12,6 @@ echo ""
 echo "🚀 Starting Flink Order CDC Job..."
 echo ""
 
-# Check if PostgreSQL is ready
-echo "🔍 Checking PostgreSQL connection..."
-if ! docker exec postgres-cdc pg_isready -U postgres -d ecommerce > /dev/null 2>&1; then
-    echo "❌ PostgreSQL is not ready. Make sure Docker Compose is running:"
-    echo "   docker compose up -d postgres"
-    exit 1
-fi
-
-echo "✅ PostgreSQL is ready"
-
 # Build the job
 echo "📦 Building Flink Order CDC Job..."
 ./gradlew :flink-order-cdc:shadowJar

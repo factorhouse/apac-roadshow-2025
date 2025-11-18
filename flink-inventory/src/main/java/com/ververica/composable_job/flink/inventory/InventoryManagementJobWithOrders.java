@@ -123,10 +123,7 @@ public class InventoryManagementJobWithOrders {
 
         LOG.info("\n📥 PATTERN 01: Creating Product Hybrid Source (File → Kafka)");
 
-        HybridSource<String> productSource = HybridSourceExample.createHybridSource(
-            config.getInitialProductsFile(),
-            config.getKafkaBootstrapServers()
-        );
+        HybridSource<String> productSource = HybridSourceExample.createHybridSource(config);
 
         DataStream<String> rawProductStream = env.fromSource(
             productSource,
@@ -148,6 +145,7 @@ public class InventoryManagementJobWithOrders {
 
         KafkaSink<String> productsSink = KafkaSink.<String>builder()
             .setBootstrapServers(config.getKafkaBootstrapServers())
+            .setKafkaProducerConfig(config.getKafkaPropertiesAsProperties())
             .setRecordSerializer(KafkaRecordSerializationSchema.builder()
                 .setTopic("products")
                 .setValueSerializationSchema(new SimpleStringSchema())
@@ -172,7 +170,7 @@ public class InventoryManagementJobWithOrders {
         KafkaSource<String> orderEventsSource = KafkaSource.<String>builder()
             .setBootstrapServers(config.getKafkaBootstrapServers())
             .setTopics("order-events")
-            .setGroupId("inventory-order-consumer")
+            .setGroupId(config.getKafkaGroupId())
             .setStartingOffsets(OffsetsInitializer.latest())
             .setValueOnlyDeserializer(new SimpleStringSchema())
             .build();

@@ -97,7 +97,7 @@ if __name__ == "__main__":
         "processing_fanout",
         "ecommerce_events",
         "ecommerce_processing_fanout",
-        "product_updates",
+        "product-updates",
         "recommendations",
         "inventory_updates",
         "inventory-events",

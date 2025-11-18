@@ -4,8 +4,8 @@
 # KartShoppe Training Platform Startup
 # ==============================================================================
 # Starts the core platform WITHOUT any Flink jobs
-# - Redpanda (Kafka)
-# - Postgres Instance
+# - Instaclustr Kafka Cluster
+# - Instaclustr Postgres Instance
 # - Quarkus API with integrated frontend (Quinoa)
 # - Standalone Flink Cluster
 # - Kpow and Flex
@@ -84,7 +84,7 @@ echo -e "${GREEN}✓${NC} Node.js ${NODE_VERSION}"
 echo ""
 
 # ==============================================================================
-# Step 2: Start Infrastructure
+# Step 2: Initialize Postgres Instance
 # ==============================================================================
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -92,46 +92,10 @@ echo -e "${BLUE}Step 2/5: Starting Infrastructure${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-echo -e "${YELLOW}Starting PostgreSQL (for order persistence & CDC)...${NC}"
-docker compose -f compose-local.yml up -d postgres
+## INIT DB
 
-# Wait for PostgreSQL to be healthy
-echo -e "${YELLOW}Waiting for PostgreSQL to be healthy...${NC}"
-timeout 30 bash -c 'until docker compose -f compose-local.yml ps postgres | grep -q "healthy"; do sleep 2; echo -n "."; done' || {
-    echo -e "\n${RED}✗ PostgreSQL failed to start${NC}"
-    exit 1
-}
-echo ""
-echo -e "${GREEN}✓${NC} PostgreSQL is healthy"
-
-# Initialize PostgreSQL schema (only if not already initialized)
-echo -e "${YELLOW}Initializing PostgreSQL schema...${NC}"
-if docker exec postgres-cdc psql -U postgres -d ecommerce -c "SELECT 1 FROM orders LIMIT 1;" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓${NC} PostgreSQL schema already initialized"
-else
-    echo -e "${YELLOW}  Running scripts/postgres-init.sql via docker exec...${NC}"
-    cat scripts/postgres-init.sql | docker exec -i postgres-cdc psql -U postgres -d ecommerce > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓${NC} PostgreSQL schema initialized successfully"
-    else
-        echo -e "${RED}✗ Failed to initialize PostgreSQL schema${NC}"
-        exit 1
-    fi
-fi
-
-echo -e "${YELLOW}Starting Redpanda (Kafka), Kpow, Flex, and Flink...${NC}"
-docker compose -f compose-local.yml up -d redpanda kpow flex jobmanager taskmanager
-
-# Wait for Redpanda to be healthy
-echo -e "${YELLOW}Waiting for Redpanda to be healthy...${NC}"
-timeout 60 bash -c 'until docker compose -f compose-local.yml ps redpanda | grep -q "healthy"; do sleep 2; echo -n "."; done' || {
-    echo -e "\n${RED}✗ Redpanda failed to start${NC}"
-    exit 1
-}
-echo ""
-echo -e "${GREEN}✓${NC} Redpanda is healthy"
-
-echo ""
+echo -e "${YELLOW}Starting Kpow, Flex, and Flink...${NC}"
+docker compose -f compose-managed.yml up -d kpow flex jobmanager taskmanager
 
 # ==============================================================================
 # Step 3: Create Kafka Topics
@@ -142,28 +106,7 @@ echo -e "${BLUE}Step 3/5: Creating Kafka Topics${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-docker compose -f compose-local.yml up redpanda-init-topics
-
-TOPICS=(
-    "websocket_fanout"
-    "processing_fanout"
-    "ecommerce_events"
-    "ecommerce_processing_fanout"
-    "product-updates"
-    "recommendations"
-    "inventory_updates"
-    "inventory-events"
-    "shopping-cart-events"
-    "basket-patterns"
-    "order-events"
-    "product-recommendations"
-)
-
-for topic in "${TOPICS[@]}"; do
-    echo -e "${GREEN}✓${NC} Topic '${topic}' ready"
-done
-
-echo ""
+## CREATE TOPICS
 
 # ==============================================================================
 # Step 4: Prepare Frontend
@@ -268,7 +211,7 @@ echo -e "  Docker:  ${CYAN}docker compose logs -f${NC}"
 echo ""
 
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}To stop the platform:${NC} ${GREEN}./stop-platform-local.sh${NC}"
+echo -e "${YELLOW}To stop the platform:${NC} ${GREEN}./stop-platform-managed.sh${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -277,7 +220,7 @@ cleanup() {
     echo ""
     echo -e "${YELLOW}Shutting down platform...${NC}"
     kill $QUARKUS_PID 2>/dev/null || true
-    docker compose -f compose-local.yml down
+    docker compose -f compose-managed.yml down
     rm -rf .pids
     echo -e "${GREEN}Platform stopped${NC}"
     exit 0

@@ -2,11 +2,14 @@
 quarkus.http.port=8081
 
 # Connection Details
-kafka.bootstrap.servers=localhost:19092
+kafka.bootstrap.servers=${KAFKA_BOOTSTRAP_SERVERS}
 
-postgres.jdbc.url=jdbc:postgresql://localhost:5432/ecommerce
-postgres.username=postgres
-postgres.password=postgres
+postgres.host=${POSTGRES_HOST}
+postgres.port=${POSTGRES_PORT}
+postgres.db=${POSTGRES_DB}
+postgres.username=${POSTGRES_USER}
+postgres.password=${POSTGRES_PASSWORD}
+postgres.jdbc.url=jdbc:postgresql://${postgres.host}:${postgres.port}/${postgres.db}
 
 # Dev Services Configuration - Disabled since Redpanda is already running
 %dev.quarkus.kafka.devservices.enabled=false

@@ -81,14 +81,19 @@ public class OrderCDCJob {
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        // Load configuration from environment
+        // Load PostgreSQL configuration from environment
         String postgresHost = System.getenv().getOrDefault("POSTGRES_HOST", "localhost");
         String postgresPort = System.getenv().getOrDefault("POSTGRES_PORT", "5432");
         String postgresDb = System.getenv().getOrDefault("POSTGRES_DB", "ecommerce");
         String postgresUser = System.getenv().getOrDefault("POSTGRES_USER", "postgres");
         String postgresPassword = System.getenv().getOrDefault("POSTGRES_PASSWORD", "postgres");
-        String kafkaBootstrapServers = System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:19092");
 
+        // Load Kafka configuration from environment
+        String kafkaBootstrapServers = System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:19092");
+        String kafkaUser = System.getenv("KAFKA_USER");
+        String kafkaPassword = System.getenv("KAFKA_PASSWORD");
+        Properties kafkaSinkProps = createKafkaProperties(kafkaUser, kafkaPassword);
+        
         int parallelism = Integer.parseInt(System.getenv().getOrDefault("PARALLELISM", "1"));
         env.setParallelism(parallelism);
 
@@ -179,6 +184,7 @@ public class OrderCDCJob {
 
         KafkaSink<String> kafkaSink = KafkaSink.<String>builder()
             .setBootstrapServers(kafkaBootstrapServers)
+            .setKafkaProducerConfig(kafkaSinkProps)
             .setRecordSerializer(
                 KafkaRecordSerializationSchema.builder()
                     .setTopic("order-events")
@@ -201,4 +207,32 @@ public class OrderCDCJob {
 
         env.execute("Order CDC Job (PostgreSQL → Kafka)");
     }
+
+
+    /**
+     * Creates a Properties object for the Kafka sink, automatically adding SASL/SCRAM
+     * security configuration if the user and password environment variables are present.
+     *
+     * @param kafkaUser     The Kafka username from the environment variable. Can be null.
+     * @param kafkaPassword The Kafka password from the environment variable. Can be null.
+     * @return A Properties object configured for the Kafka sink.
+     */
+    private static Properties createKafkaProperties(String kafkaUser, String kafkaPassword) {
+        Properties props = new Properties();
+        if (kafkaUser != null && !kafkaUser.isEmpty() && kafkaPassword != null && !kafkaPassword.isEmpty()) {
+            LOG.info("🔐 Security variables detected. Configuring SASL/SCRAM for Kafka Sink.");
+            String jaasConfig = String.format(
+                "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";",
+                kafkaUser,
+                kafkaPassword
+            );
+            props.setProperty("security.protocol", "SASL_PLAINTEXT");
+            props.setProperty("sasl.mechanism", "SCRAM-SHA-256");
+            props.setProperty("sasl.jaas.config", jaasConfig);
+        } else {
+            LOG.info("⚪ No security variables found. Assuming local, unsecured Kafka connection.");
+        }
+        return props;
+    }
+
 }

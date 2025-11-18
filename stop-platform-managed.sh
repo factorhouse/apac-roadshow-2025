@@ -53,7 +53,7 @@ fi
 
 # Stop Docker Compose services
 echo -e "${YELLOW}Stopping Docker services...${NC}"
-docker compose -f compose-local.yml down -v
+docker compose -f compose-managed.yml down -v
 echo -e "${GREEN}✓${NC} Docker services stopped"
 
 # Clean up PID files

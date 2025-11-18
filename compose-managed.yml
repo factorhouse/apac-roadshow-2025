@@ -6,12 +6,13 @@ services:
     restart: always
     ports:
       - "4000:3000"
-    depends_on:
-      redpanda:
-        condition: service_healthy
     environment:
-      ENVIRONMENT_NAME: "Local Redpands Cluster" # to update
-      BOOTSTRAP: redpanda:9092 # to update
+      ENVIRONMENT_NAME: "Instaclustr Kafka Cluster"
+      BOOTSTRAP: ${KAFKA_BOOTSTRAP_SERVERS}
+      SECURITY_PROTOCOL: "SASL_PLAINTEXT"
+      SASL_MECHANISM: "SCRAM-SHA-256"
+      # prettier-ignore
+      SASL_JAAS_CONFIG: "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"${KAFKA_USER}\" password=\"${KAFKA_PASSWORD}\";"
     env_file:
       - ${KPOW_LICENSE:-license-kpow.env}
 
@@ -42,6 +43,16 @@ services:
     ports:
       - "18081:8081"
     environment:
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
+      - KAFKA_USER=${KAFKA_USER}
+      - KAFKA_PASSWORD=${KAFKA_PASSWORD}
+      - INITIAL_PRODUCTS_FILE=${INITIAL_PRODUCTS_FILE}
+      - PARALLELISM=${PARALLELISM}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
@@ -63,6 +74,16 @@ services:
     container_name: taskmanager
     command: taskmanager
     environment:
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
+      - KAFKA_USER=${KAFKA_USER}
+      - KAFKA_PASSWORD=${KAFKA_PASSWORD}
+      - INITIAL_PRODUCTS_FILE=${INITIAL_PRODUCTS_FILE}
+      - PARALLELISM=${PARALLELISM}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
@@ -75,6 +96,3 @@ services:
     depends_on:
       jobmanager:
         condition: service_healthy
-
-volumes:
-  postgres-data:

@@ -6,19 +6,14 @@
 # - Order-based inventory deduction (from order-events topic)
 # - Real-time inventory updates when orders are placed
 
+set -e
+
 echo "🚀 Starting ENHANCED Inventory Management Job (WITH ORDER DEDUCTION)..."
 
-# Configuration
-#   The environment varaibles are for indication only.
-#   Actual environment values are configured in the Flink docker compose services
-export INITIAL_PRODUCTS_FILE=${INITIAL_PRODUCTS_FILE:-/tmp/initial-products.json}
-export KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
-export PARALLELISM=${PARALLELISM:-1}
+# Load and Print Environment Configuration from .env file
+source env.sh
+load_and_print_env
 
-echo "📂 Configuration:"
-echo "   Products file: ${INITIAL_PRODUCTS_FILE}"
-echo "   Kafka: ${KAFKA_BOOTSTRAP_SERVERS}"
-echo "   Parallelism: ${PARALLELISM}"
 echo ""
 echo "🆕 This job includes ORDER DEDUCTION:"
 echo "   - Listens to order-events topic"
@@ -61,14 +56,8 @@ echo "✅ Enhanced Inventory Management Job deployed"
 # # Get the script directory
 # SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# # Set environment variables with absolute paths
-# export KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS:-localhost:19092}
-# export INITIAL_PRODUCTS_FILE=${INITIAL_PRODUCTS_FILE:-$SCRIPT_DIR/data/initial-products.json}
-# export PARALLELISM=${PARALLELISM:-1}
+# ...
 
-# # Run the job
-# echo ""
-# echo "▶️  Running ENHANCED Inventory Management Job..."
 # echo ""
 # java --add-opens java.base/java.util=ALL-UNNAMED \
 #   -cp flink-inventory/build/libs/flink-inventory.jar \

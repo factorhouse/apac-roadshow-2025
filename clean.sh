@@ -50,4 +50,4 @@ echo -e "\n${GREEN}========================================"
 echo -e "✅ Environment cleaned successfully!"
 echo -e "========================================${NC}"
 echo
-echo -e "To start fresh: ${YELLOW}./start-platform.sh${NC}"
+echo -e "To start fresh: ${YELLOW}./start-platform-local.sh${NC} or ${YELLOW}./start-platform-managed.sh${NC}"

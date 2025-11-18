@@ -126,7 +126,7 @@ public class InventoryManagementJob {
         // Create unbounded Kafka source for continuous updates
         KafkaSource<String> kafkaSource = KafkaSource.<String>builder()
             .setBootstrapServers(bootstrapServers)
-            .setTopics("product_updates")
+            .setTopics("product-updates")
             .setGroupId("inventory-management-hybrid")
             .setStartingOffsets(OffsetsInitializer.latest())
             .setValueOnlyDeserializer(new SimpleStringSchema())

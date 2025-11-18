@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 
 /**
  * Main configuration class for the Inventory Management Job.
@@ -120,15 +121,34 @@ public class InventoryConfig implements Serializable {
      * @return InventoryConfig initialized from environment
      */
     public static InventoryConfig fromEnvironment() {
-        return builder()
+        Builder builder = builder()
             .withKafkaBootstrapServers(getEnv("KAFKA_BOOTSTRAP_SERVERS", "localhost:19092"))
             .withKafkaGroupId(getEnv("KAFKA_GROUP_ID", "inventory-management-hybrid"))
             .withInitialProductsFile(getEnv("INITIAL_PRODUCTS_FILE", "data/initial-products.json"))
             .withCheckpointPath(getEnv("CHECKPOINT_PATH", "file:///tmp/flink-checkpoints"))
             .withCheckpointInterval(Long.parseLong(getEnv("CHECKPOINT_INTERVAL_MS", "60000")))
             .withParallelism(Integer.parseInt(getEnv("PARALLELISM", "2")))
-            .withJobName(getEnv("JOB_NAME", "Inventory Management with Hybrid Source"))
-            .build();
+            .withJobName(getEnv("JOB_NAME", "Inventory Management with Hybrid Source"));
+
+        // Automatically add security config if env vars are set
+        String kafkaUser = System.getenv("KAFKA_USER");
+        String kafkaPassword = System.getenv("KAFKA_PASSWORD");
+
+        if (kafkaUser != null && !kafkaUser.isEmpty() && kafkaPassword != null && !kafkaPassword.isEmpty()) {
+            System.out.println("🔐 Security variables detected in InventoryConfig. Configuring SASL/SCRAM.");
+            String jaasConfig = String.format(
+                "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";",
+                kafkaUser,
+                kafkaPassword
+            );
+            builder.withKafkaProperty("security.protocol", "SASL_PLAINTEXT");
+            builder.withKafkaProperty("sasl.mechanism", "SCRAM-SHA-256");
+            builder.withKafkaProperty("sasl.jaas.config", jaasConfig);
+        } else {
+             System.out.println("⚪ No security variables found in InventoryConfig. Assuming local, unsecured Kafka.");
+        }
+
+        return builder.build();
     }
 
     /**
@@ -565,5 +585,17 @@ public class InventoryConfig implements Serializable {
             config.validate();
             return config;
         }
+    }
+
+    /**
+     * Returns the Kafka properties as a java.util.Properties object,
+     * which is required by the Flink Kafka connectors.
+     *
+     * @return Kafka properties as a Properties object.
+     */
+    public Properties getKafkaPropertiesAsProperties() {
+        Properties props = new Properties();
+        props.putAll(this.kafkaProperties);
+        return props;
     }
 }

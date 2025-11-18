@@ -6,11 +6,12 @@ kafka.bootstrap.servers=${KAFKA_BOOTSTRAP_SERVERS}
 kafka.user=${KAFKA_USER}
 kafka.password=${KAFKA_PASSWORD}
 
-postgres.host.ports=${POSTGRES_HOST_PORTS}
-postgres.database=${POSTGRES_DATABASE}
+postgres.host=${POSTGRES_HOST}
+postgres.port=${POSTGRES_PORT}
+postgres.db=${POSTGRES_DB}
 postgres.username=${POSTGRES_USER}
 postgres.password=${POSTGRES_PASSWORD}
-postgres.jdbc.url=jdbc:postgresql://${postgres.host.ports}/${postgres.database}
+postgres.jdbc.url=jdbc:postgresql://${postgres.host}:${postgres.port}/${postgres.db}
 
 # KAFKA SECURITY - Common Configuration for ALL Channels
 kafka-connector-common-config-mp.security.protocol=SASL_PLAINTEXT

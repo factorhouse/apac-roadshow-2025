@@ -115,10 +115,7 @@ public class InventoryManagementJobRefactored {
         LOG.info("   Kafka: {}", config.getKafkaBootstrapServers());
 
         // Use pattern example's factory method
-        HybridSource<String> productSource = HybridSourceExample.createHybridSource(
-            config.getInitialProductsFile(),
-            config.getKafkaBootstrapServers()
-        );
+        HybridSource<String> productSource = HybridSourceExample.createHybridSource(config);
 
         DataStream<String> rawProductStream = env.fromSource(
             productSource,

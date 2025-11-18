@@ -61,6 +61,7 @@ public class SinkFactory {
     public static KafkaSink<String> createInventoryEventsSink(InventoryConfig config) {
         KafkaSink<String> sink = KafkaSink.<String>builder()
             .setBootstrapServers(config.getKafkaBootstrapServers())
+            .setKafkaProducerConfig(config.getKafkaPropertiesAsProperties())
             .setRecordSerializer(KafkaRecordSerializationSchema.builder()
                 .setTopic(KafkaTopics.INVENTORY_EVENTS)
                 .setValueSerializationSchema(new SimpleStringSchema())
@@ -81,6 +82,7 @@ public class SinkFactory {
     public static KafkaSink<String> createAlertsSink(InventoryConfig config) {
         KafkaSink<String> sink = KafkaSink.<String>builder()
             .setBootstrapServers(config.getKafkaBootstrapServers())
+            .setKafkaProducerConfig(config.getKafkaPropertiesAsProperties())
             .setRecordSerializer(KafkaRecordSerializationSchema.builder()
                 .setTopic(KafkaTopics.INVENTORY_ALERTS)
                 .setValueSerializationSchema(new SimpleStringSchema())
@@ -108,6 +110,7 @@ public class SinkFactory {
     public static KafkaSink<String> createWebSocketSink(InventoryConfig config) {
         KafkaSink<String> sink = KafkaSink.<String>builder()
             .setBootstrapServers(config.getKafkaBootstrapServers())
+            .setKafkaProducerConfig(config.getKafkaPropertiesAsProperties())
             .setRecordSerializer(KafkaRecordSerializationSchema.builder()
                 .setTopic(KafkaTopics.WEBSOCKET_FANOUT)
                 .setValueSerializationSchema(new SimpleStringSchema())
@@ -128,6 +131,7 @@ public class SinkFactory {
     public static KafkaSink<String> createProductsSink(InventoryConfig config) {
         KafkaSink<String> sink = KafkaSink.<String>builder()
             .setBootstrapServers(config.getKafkaBootstrapServers())
+            .setKafkaProducerConfig(config.getKafkaPropertiesAsProperties())
             .setRecordSerializer(KafkaRecordSerializationSchema.builder()
                 .setTopic(KafkaTopics.PRODUCTS)
                 .setValueSerializationSchema(new SimpleStringSchema())

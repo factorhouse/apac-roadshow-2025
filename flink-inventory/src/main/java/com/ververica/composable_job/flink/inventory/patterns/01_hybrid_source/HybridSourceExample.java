@@ -1,5 +1,6 @@
 package com.ververica.composable_job.flink.inventory.patterns.hybrid_source;
 
+import com.ververica.composable_job.flink.inventory.shared.config.InventoryConfig;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -53,12 +54,10 @@ public class HybridSourceExample {
 
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-
-        String bootstrapServers = System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:19092");
-        String filePath = System.getenv().getOrDefault("INITIAL_PRODUCTS_FILE", "data/initial-products.json");
+        InventoryConfig config = InventoryConfig.fromEnvironment();
 
         // Create hybrid source: File → Kafka
-        HybridSource<String> hybridSource = createHybridSource(filePath, bootstrapServers);
+        HybridSource<String> hybridSource = createHybridSource(config);
 
         // Use hybrid source - downstream code doesn't know if data is from file or Kafka!
         DataStream<String> productStream = env.fromSource(
@@ -86,23 +85,24 @@ public class HybridSourceExample {
      *
      * The switch happens automatically when the file source completes.
      */
-    public static HybridSource<String> createHybridSource(String filePath, String bootstrapServers) {
+    public static HybridSource<String> createHybridSource(InventoryConfig config) {
         // STEP 1: Create BOUNDED file source for initial load
         FileSource<String> fileSource = FileSource
             .forRecordStreamFormat(
                 new WholeFileStreamFormat(),  // Custom format that reads entire file at once
-                new Path(filePath)
+                new Path(config.getInitialProductsFile())
             )
             .build();
 
         // STEP 2: Create UNBOUNDED Kafka source for continuous updates
         KafkaSource<String> kafkaSource = KafkaSource.<String>builder()
-            .setBootstrapServers(bootstrapServers)
-            .setTopics("product_updates")
-            .setGroupId("hybrid-source-example")
+            .setBootstrapServers(config.getKafkaBootstrapServers())
+            .setTopics(config.getProductUpdatesTopic())
+            .setGroupId(config.getKafkaGroupId())
             .setStartingOffsets(OffsetsInitializer.latest())  // Only NEW messages after file
             .setValueOnlyDeserializer(new SimpleStringSchema())
             .setProperty("partition.discovery.interval.ms", "10000")  // Discover new partitions
+            .setProperties(config.getKafkaPropertiesAsProperties())
             .build();
 
         // STEP 3: Build hybrid source
@@ -111,7 +111,7 @@ public class HybridSourceExample {
             .addSource(kafkaSource)
             .build();
 
-        LOG.info("✅ Hybrid Source created: {} (file) → {} (Kafka)", filePath, bootstrapServers);
+        LOG.info("✅ Hybrid Source created: {} (file) → {} (Kafka)", config.getInitialProductsFile(), config.getKafkaBootstrapServers());
         LOG.info("📖 Will first load all products from file, then switch to live Kafka stream");
 
         return hybridSource;

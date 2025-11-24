@@ -81,9 +81,9 @@ The script either creates and deletes required Kafka topics.
 **Example 1: Create topics - existing topics are ignored**
 
 ```bash
-python scripts/manage_topics.py -b <KAFKA_BOOTSTRAP_SERVERS> \
-  -u <KAFKA_USER> -p <KAFKA_PASSWORD> --action create
+python scripts/manage_topics.py --action create
 
+# ...
 # [2025-11-18 14:12:33,605] INFO: Topic 'websocket_fanout' created
 # [2025-11-18 14:12:33,605] INFO: Topic 'processing_fanout' created
 # [2025-11-18 14:12:33,605] INFO: Topic 'ecommerce_events' created
@@ -96,14 +96,15 @@ python scripts/manage_topics.py -b <KAFKA_BOOTSTRAP_SERVERS> \
 # [2025-11-18 14:12:33,606] INFO: Topic 'basket-patterns' created
 # [2025-11-18 14:12:33,606] INFO: Topic 'order-events' created
 # [2025-11-18 14:12:33,606] INFO: Topic 'product-recommendations' created
+# ...
 ```
 
 **Example 2: Delete topics - non-existing topics are ignored**
 
 ```bash
-python scripts/manage_topics.py -b <KAFKA_BOOTSTRAP_SERVERS> \
-  -u <KAFKA_USER> -p <KAFKA_PASSWORD> --action delete
+python scripts/manage_topics.py --action delete
 
+# ...
 # [2025-11-18 14:13:14,297] INFO: Topic 'websocket_fanout' deleted
 # [2025-11-18 14:13:14,298] INFO: Topic 'processing_fanout' deleted
 # [2025-11-18 14:13:14,298] INFO: Topic 'ecommerce_events' deleted
@@ -116,33 +117,65 @@ python scripts/manage_topics.py -b <KAFKA_BOOTSTRAP_SERVERS> \
 # [2025-11-18 14:13:14,298] INFO: Topic 'basket-patterns' deleted
 # [2025-11-18 14:13:14,298] INFO: Topic 'order-events' deleted
 # [2025-11-18 14:13:14,298] INFO: Topic 'product-recommendations' deleted
+# ...
 ```
 
 ### Manage Database (`scripts/manage_db.py`)
 
-The script can either create a new database or remove an existing one. When creating a database, it first sets up the database and then runs the SQL commands defined in `scripts/postgres-init.sql`.
+This script manages a PostgreSQL database and its schema, supporting environments
+with different user permission levels. Here are the four main commands:
 
-**Example 1: Creating a DB**
+- **up:** Creates the database AND initializes the schema. (Requires DB creation privileges).
+- **down:** Drops the entire database. (Requires DB dropping privileges).
+- **init:** Initializes the schema (tables, data, etc.) in an EXISTING database.
+- **teardown:** Drops only the schema objects (tables, etc.) from the database, but leaves the database itself.
+
+In a workshop environment where an attendee may not have permission to create or
+drop a database, the `init` and `teardown` commands are used. These commands
+only manage the schema (tables, data, etc.) within a pre-existing database.
+
+For administrators with full privileges, the `up` and `down` commands can be
+used to create and drop the entire database, respectively.
+
+**Example 1: Creates the database AND initializes the schema**
 
 ```bash
-(venv) $ python scripts/manage_db.py -H <POSTGRES_HOST> \
-  -u <POSTGRES_USER> -p <POSTGRES_PASSWORD> -d <POSTGRES_DB> --action up
+(venv) $ python ./scripts/manage_db.py --action up
 
-# ▶️  Ensuring database 'ecommerce' exists...
-#    - Database 'ecommerce' created.
-# ▶️  Applying schema and data from '<path-to-file>/postgres-init.sql' to 'ecommerce'...
-# ✅ Database schema and data applied successfully.
+# [2025-11-24 11:15:08,048] INFO: Ensuring database 'ecommerce' exists...
+# [2025-11-24 11:15:08,304] INFO: Database 'ecommerce' created.
+# [2025-11-24 11:15:08,304] INFO: Applying schema and data from '<path-to-file>/postgres-init.sql' to 'ecommerce'...
+# [2025-11-24 11:15:08,434] INFO: Database schema and data applied successfully.
 ```
 
-**Example 2: Deleting a DB**
-
-- Make sure there is no existing connection to the DB.
+**Example 2: Drops the entire database**
 
 ```bash
-(venv) $ python scripts/manage_db.py -H <POSTGRES_HOST> \
-  -u <POSTGRES_USER> -p <POSTGRES_PASSWORD> -d <POSTGRES_DB> --action down
+(venv) $ python ./scripts/manage_db.py --action down
 
-# ▶️  Dropping database 'ecommerce'...
-#    - Executing: DROP DATABASE IF EXISTS "ecommerce"
-# ✅ Database 'ecommerce' dropped successfully.
+# [2025-11-24 11:14:32,260] INFO: Dropping database 'ecommerce'...
+# [2025-11-24 11:14:32,349] INFO: Executing drop command...
+# [2025-11-24 11:14:32,398] INFO: Database 'ecommerce' dropped successfully.
+```
+
+**Example 3: Initializes the schema (tables, data, etc.) in an EXISTING database**
+
+```bash
+(venv) $ python ./scripts/manage_db.py --action init
+
+# [2025-11-24 11:23:15,539] INFO: Connecting to database 'ecommerce' to initialize schema...
+# [2025-11-24 11:23:15,607] INFO: Applying schema and data from '<path-to-file>/postgres-init.sql' to 'ecommerce'...
+# [2025-11-24 11:23:15,652] INFO: Database schema and data applied successfully.
+```
+
+**Example 4: Drops only the schema objects (tables, etc.) from the database**
+
+```bash
+(venv) $ python ./scripts/manage_db.py --action teardown
+
+# [2025-11-24 11:23:28,765] INFO: Connecting to database 'ecommerce' to tear down schema...
+# [2025-11-24 11:23:28,837] INFO: Dropping publication 'workshop_cdc'...
+# [2025-11-24 11:23:28,852] INFO: Dropping tables: products, customers, orders, order_items, inventory, product_views...
+# [2025-11-24 11:23:28,897] INFO: Dropping trigger function 'update_updated_at_column'...
+# [2025-11-24 11:23:28,916] INFO: Database schema torn down successfully.
 ```

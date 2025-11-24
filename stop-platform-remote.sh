@@ -69,10 +69,21 @@ if [ -f "/tmp/quarkus.pid" ]; then
     rm -f /tmp/quarkus.pid
 fi
 
+# Clean up PostgreSQL CDC Replication Slot
+echo -e "${YELLOW}Cleaning up CDC replication slot...${NC}"
+if [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate
+    python scripts/manage_db.py --action clean-cdc
+    deactivate
+    echo -e "${GREEN}✓${NC} CDC cleanup complete"
+else
+    echo -e "${YELLOW}Skipping CDC cleanup: Python virtual environment 'venv' not found.${NC}"
+fi
+
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║              All services stopped successfully!                ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${BLUE}To start again, run:${NC} ${GREEN}./start-platform-local.sh${NC}"
+echo -e "${BLUE}To start again, run:${NC} ${GREEN}./start-platform-remote.sh${NC}"
 echo ""

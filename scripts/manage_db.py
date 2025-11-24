@@ -1,152 +1,258 @@
 import argparse
 import sys
 import logging
+import os
 import psycopg2
+from dotenv import load_dotenv
 from pathlib import Path
 from psycopg2 import sql, errors
 
-# The source SQL file for the 'up' command.
-script_dir = Path(__file__).parent
-SQL_FILE = Path(__file__).parent / "postgres-init.sql"
+# --- Logging Configuration ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] %(levelname)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# --- Path and Environment Setup ---
+script_dir = Path(__file__).resolve().parent
+SQL_FILE = script_dir / "postgres-init.sql"
+DOTENV_FILE = script_dir.parent / ".env"
+load_dotenv(dotenv_path=DOTENV_FILE)
+
+# --- Load Configuration from Environment ---
+DB_HOST = os.getenv("POSTGRES_HOST")
+DB_PORT = os.getenv("POSTGRES_PORT")
+DB_NAME = os.getenv("POSTGRES_DB")
+DB_USER = os.getenv("POSTGRES_USER")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+DB_SLOT_NAME = os.getenv("POSTGRES_REPLICATION_SLOT")
+
+# --- List of objects to manage for schema-only operations ---
+TABLES_TO_MANAGE = [
+    "products",
+    "customers",
+    "orders",
+    "order_items",
+    "inventory",
+    "product_views",
+]
+PUBLICATION_NAME = "workshop_cdc"
+TRIGGER_FUNCTION_NAME = "update_updated_at_column"
 
 
-def get_connection(args, db_override=None):
-    """Establishes a connection to the PostgreSQL database using argparse arguments."""
+def get_connection(dbname_override=None):
+    """Establishes a connection to the PostgreSQL database."""
     db_config = {
-        "dbname": db_override if db_override else args.dbname,
-        "user": args.user,
-        "password": args.password,
-        "host": args.host,
-        "port": args.port,
+        "dbname": dbname_override if dbname_override else DB_NAME,
+        "user": DB_USER,
+        "password": DB_PASSWORD,
+        "host": DB_HOST,
+        "port": DB_PORT,
     }
     try:
-        conn = psycopg2.connect(**db_config)
-        return conn
+        return psycopg2.connect(**db_config)
     except psycopg2.OperationalError as e:
-        logging.error(
-            f"❌ Could not connect to the database (dbname: '{db_config['dbname']}'): {e}"
-        )
-        logging.error(
-            "   Please ensure PostgreSQL is running and connection details are correct."
+        logger.error(f"Could not connect to database '{db_config['dbname']}': {e}")
+        logger.error(
+            "Please ensure the service is running and .env details are correct."
         )
         sys.exit(1)
 
 
-def up(args):
+def create_db():
     """
-    Ensures the database exists, then applies the schema and data from the SQL file.
+    Creates the PostgreSQL database but does not initialize the schema.
+    Requires database creation privileges.
     """
-    # --- Step 1: Connect to the default 'postgres' db to create the target database ---
-    logging.info(f"▶️  Ensuring database '{args.dbname}' exists...")
-    conn_admin = get_connection(args, db_override="postgres")
-
-    # CREATE DATABASE cannot run inside a transaction, so we use autocommit.
-    conn_admin.autocommit = True
+    logger.info(f"Attempting to create database '{DB_NAME}'...")
+    conn_admin = None
     try:
+        conn_admin = get_connection(dbname_override="postgres")
+        conn_admin.autocommit = True
         with conn_admin.cursor() as cur:
-            cur.execute(
-                sql.SQL("CREATE DATABASE {}").format(sql.Identifier(args.dbname))
-            )
-            logging.info(f"   - Database '{args.dbname}' created.")
+            cur.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(DB_NAME)))
+            logger.info(f"Database '{DB_NAME}' created successfully.")
     except errors.DuplicateDatabase:
-        logging.info(
-            f"   - Database '{args.dbname}' already exists. Skipping creation."
-        )
+        logger.warning(f"Database '{DB_NAME}' already exists. No action taken.")
     except Exception as e:
-        logging.error(f"❌ An error occurred while creating the database: {e}")
+        logger.error(f"An error occurred while trying to create the database: {e}")
         sys.exit(1)
     finally:
-        conn_admin.close()
+        if conn_admin:
+            conn_admin.close()
 
-    logging.info(f"▶️  Applying schema and data from '{SQL_FILE}' to '{args.dbname}'...")
+
+def drop_replication_slot():
+    """
+    Connects to the database and drops the specified logical replication slot.
+    """
+    logger.info(f"Attempting to drop replication slot '{DB_SLOT_NAME}'...")
+    conn = None
+    try:
+        conn = get_connection()
+        # The command needs to run outside a transaction for some slot states.
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            command = sql.SQL("SELECT pg_drop_replication_slot({slot})").format(
+                slot=sql.Literal(DB_SLOT_NAME)
+            )
+            cur.execute(command)
+            logger.info(f"Successfully dropped replication slot '{DB_SLOT_NAME}'.")
+    except errors.UndefinedObject:
+        logger.warning(
+            f"Replication slot '{DB_SLOT_NAME}' does not exist. No action taken."
+        )
+    except Exception as e:
+        logger.error(f"An error occurred while trying to drop the slot: {e}")
+        sys.exit(1)
+    finally:
+        if conn:
+            conn.close()
+
+
+def init_schema():
+    """
+    Applies the schema and data from the SQL file to the configured database.
+    This function assumes the database already exists.
+    """
+    logger.info(f"Connecting to database '{DB_NAME}' to initialize schema...")
     try:
         with open(SQL_FILE, "r") as f:
-            sql_script = f.read()
+            sql_script = "\n".join(
+                line
+                for line in f.read().split("\n")
+                if not line.strip().startswith("\\")
+            )
     except FileNotFoundError:
-        logging.error(
-            f"❌ Error: SQL file '{SQL_FILE}' not found in the current directory."
-        )
+        logger.error(f"Initialization script '{SQL_FILE}' not found.")
         sys.exit(1)
 
-    # Remove psql meta-commands like \c
-    cleaned_sql = "\n".join(
-        line for line in sql_script.split("\n") if not line.strip().startswith("\\")
-    )
-
-    conn_target = get_connection(args)
-    conn_target.autocommit = False
+    conn = get_connection()
     try:
-        with conn_target.cursor() as cur:
-            cur.execute(cleaned_sql)
-        conn_target.commit()
-        logging.info("✅ Database schema and data applied successfully.")
+        with conn.cursor() as cur:
+            logger.info(f"Applying schema and data from '{SQL_FILE}'...")
+            cur.execute(sql_script)
+        conn.commit()
+        logger.info("Database schema and data applied successfully.")
     except Exception as e:
-        conn_target.rollback()
-        logging.error(f"❌ An error occurred during schema application: {e}")
+        conn.rollback()
+        logger.error(f"An error occurred during schema initialization: {e}")
         sys.exit(1)
     finally:
-        conn_target.close()
+        conn.close()
 
 
-def down(args):
+def teardown_schema():
     """
-    Tears down the entire database specified.
+    Tears down the schema (tables, publication, etc.) within the database
+    without dropping the database itself.
     """
-    logging.info(f"▶️  Dropping database '{args.dbname}'...")
+    logger.info(f"Connecting to database '{DB_NAME}' to tear down schema...")
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            logger.info(f"Dropping publication '{PUBLICATION_NAME}'...")
+            cur.execute(
+                sql.SQL("DROP PUBLICATION IF EXISTS {}").format(
+                    sql.Identifier(PUBLICATION_NAME)
+                )
+            )
 
-    # Connect to the default 'postgres' database to drop the target database
-    conn_admin = get_connection(args, db_override="postgres")
-    # DROP DATABASE cannot run inside a transaction, so we use autocommit.
+            logger.info(f"Dropping tables: {', '.join(TABLES_TO_MANAGE)}...")
+            for table in reversed(TABLES_TO_MANAGE):
+                cur.execute(
+                    sql.SQL("DROP TABLE IF EXISTS {} CASCADE").format(
+                        sql.Identifier(table)
+                    )
+                )
+
+            logger.info(f"Dropping trigger function '{TRIGGER_FUNCTION_NAME}'...")
+            cur.execute(
+                sql.SQL("DROP FUNCTION IF EXISTS {}()").format(
+                    sql.Identifier(TRIGGER_FUNCTION_NAME)
+                )
+            )
+
+        conn.commit()
+        logger.info("Database schema torn down successfully.")
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"An error occurred during schema teardown: {e}")
+        sys.exit(1)
+    finally:
+        conn.close()
+
+
+def up():
+    """
+    Ensures the database exists (creating it if necessary) and then initializes the schema.
+    """
+    create_db()
+    init_schema()
+
+
+def down():
+    """
+    Tears down the entire database specified in the .env file.
+    """
+    logger.info(f"Dropping database '{DB_NAME}'...")
+    conn_admin = get_connection(dbname_override="postgres")
     conn_admin.autocommit = True
 
     try:
         with conn_admin.cursor() as cur:
-            command = sql.SQL("DROP DATABASE IF EXISTS {}").format(
-                sql.Identifier(args.dbname)
+            command = sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(
+                sql.Identifier(DB_NAME)
             )
-            logging.info(f"   - Executing: {command.as_string(cur)}")
+            logger.info("Executing drop command...")
             cur.execute(command)
-        logging.info(f"✅ Database '{args.dbname}' dropped successfully.")
+        logger.info(f"Database '{DB_NAME}' dropped successfully.")
     except Exception as e:
-        logging.error(f"❌ An error occurred during 'down' operation: {e}")
+        logger.error(f"An error occurred during 'down' operation: {e}")
         sys.exit(1)
     finally:
         conn_admin.close()
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if not all([DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD]):
+        raise ValueError(
+            "PostgreSQL credentials not found in the .env file of the project root directory."
+        )
 
     parser = argparse.ArgumentParser(
-        description="PostgreSQL Database Admin for Workshop"
+        description="PostgreSQL Database & Schema Manager",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
-
     parser.add_argument(
         "--action",
-        choices=["up", "down"],
+        choices=["up", "down", "init", "teardown", "create-db", "clean-cdc"],
         default="up",
-        help="Action to perform: 'up' (create DB and schema, default) or 'down' (drop DB)",
+        help=(
+            "'up':        Create DB and schema (default).\n"
+            "'down':      Drop entire DB.\n"
+            "'init':      Create schema in an existing DB.\n"
+            "'teardown':  Drop schema from an existing DB.\n"
+            "'create-db': Create the database only.\n"
+            "'clean-cdc': Remove the replication slot created by Flink CDC."
+        ),
     )
-
-    # --- Connection Arguments ---
-    parser.add_argument("--host", "-H", required=True, help="Database host")
-    parser.add_argument(
-        "--port", "-t", default=5432, type=int, help="Database port (default: 5432)"
-    )
-    parser.add_argument("--user", "-u", required=True, help="Database user")
-    parser.add_argument(
-        "--password",
-        "-p",
-        required=True,
-        help="Database password",
-    )
-    parser.add_argument(
-        "--dbname", "-d", default="ecommerce", help="Database name (default: ecommerce)"
-    )
-
     args = parser.parse_args()
 
-    if args.action == "up":
-        up(args)
-    else:
-        down(args)
+    action_map = {
+        "up": up,
+        "down": down,
+        "init": init_schema,
+        "teardown": teardown_schema,
+        "create-db": create_db,
+        "clean-cdc": drop_replication_slot,
+    }
+
+    if args.action == "clean-cdc" and not DB_SLOT_NAME:
+        raise ValueError(
+            "POSTGRES_REPLICATION_SLOT is not found in the .env file of the project root directory."
+        )
+
+    # Execute the chosen action
+    action_map[args.action]()

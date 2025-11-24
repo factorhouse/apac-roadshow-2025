@@ -26,6 +26,7 @@ DB_PORT = os.getenv("POSTGRES_PORT")
 DB_NAME = os.getenv("POSTGRES_DB")
 DB_USER = os.getenv("POSTGRES_USER")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+DB_SLOT_NAME = os.getenv("POSTGRES_REPLICATION_SLOT")
 
 # --- List of objects to manage for schema-only operations ---
 TABLES_TO_MANAGE = [
@@ -80,6 +81,34 @@ def create_db():
     finally:
         if conn_admin:
             conn_admin.close()
+
+
+def drop_replication_slot():
+    """
+    Connects to the database and drops the specified logical replication slot.
+    """
+    logger.info(f"Attempting to drop replication slot '{DB_SLOT_NAME}'...")
+    conn = None
+    try:
+        conn = get_connection()
+        # The command needs to run outside a transaction for some slot states.
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            command = sql.SQL("SELECT pg_drop_replication_slot({slot})").format(
+                slot=sql.Literal(DB_SLOT_NAME)
+            )
+            cur.execute(command)
+            logger.info(f"Successfully dropped replication slot '{DB_SLOT_NAME}'.")
+    except errors.UndefinedObject:
+        logger.warning(
+            f"Replication slot '{DB_SLOT_NAME}' does not exist. No action taken."
+        )
+    except Exception as e:
+        logger.error(f"An error occurred while trying to drop the slot: {e}")
+        sys.exit(1)
+    finally:
+        if conn:
+            conn.close()
 
 
 def init_schema():
@@ -192,17 +221,21 @@ if __name__ == "__main__":
             "PostgreSQL credentials not found in the .env file of the project root directory."
         )
 
-    parser = argparse.ArgumentParser(description="PostgreSQL Database & Schema Manager")
+    parser = argparse.ArgumentParser(
+        description="PostgreSQL Database & Schema Manager",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     parser.add_argument(
         "--action",
-        choices=["up", "down", "init", "teardown", "create-db"],
+        choices=["up", "down", "init", "teardown", "create-db", "clean-cdc"],
         default="up",
         help=(
-            "'up': Create DB and schema (default). "
-            "'down': Drop entire DB. "
-            "'init': Create schema in existing DB. "
-            "'teardown': Drop schema from existing DB. "
-            "'create-db': Create the database only."
+            "'up':        Create DB and schema (default).\n"
+            "'down':      Drop entire DB.\n"
+            "'init':      Create schema in an existing DB.\n"
+            "'teardown':  Drop schema from an existing DB.\n"
+            "'create-db': Create the database only.\n"
+            "'clean-cdc': Remove the replication slot created by Flink CDC."
         ),
     )
     args = parser.parse_args()
@@ -213,6 +246,13 @@ if __name__ == "__main__":
         "init": init_schema,
         "teardown": teardown_schema,
         "create-db": create_db,
+        "clean-cdc": drop_replication_slot,
     }
+
+    if args.action == "clean-cdc" and not DB_SLOT_NAME:
+        raise ValueError(
+            "POSTGRES_REPLICATION_SLOT is not found in the .env file of the project root directory."
+        )
+
     # Execute the chosen action
     action_map[args.action]()

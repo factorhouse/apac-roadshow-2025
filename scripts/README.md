@@ -1,6 +1,6 @@
 # Helper Scripts
 
-Helper scripts that manage topics and database.
+Helper scripts that manage topics and database when working with Instaclstr instances.
 
 ## Setup Instructions
 
@@ -178,4 +178,13 @@ used to create and drop the entire database, respectively.
 # [2025-11-24 11:23:28,852] INFO: Dropping tables: products, customers, orders, order_items, inventory, product_views...
 # [2025-11-24 11:23:28,897] INFO: Dropping trigger function 'update_updated_at_column'...
 # [2025-11-24 11:23:28,916] INFO: Database schema torn down successfully.
+```
+
+**Example 5: Clean up resources created by Flink CDC**
+
+```bash
+(venv) $ python scripts/manage_db.py --action clean-cdc
+
+# [2025-11-24 14:55:19,271] INFO: Attempting to drop replication slot 'flink_order_cdc_slot'...
+# [2025-11-24 14:55:19,360] INFO: Successfully dropped replication slot 'flink_order_cdc_slot'.
 ```

@@ -553,14 +553,12 @@ docker compose -f compose-local.yml down -v
 
 By the end of this training, students will:
 
-✅ Understand **Flink's core concepts**: streams, state, time, windows
-✅ Build **stateful stream processing** applications
-✅ Integrate **Kafka/Redpanda** for event streaming
-✅ Deploy **ML models in real-time** with broadcast state
-✅ Use **CEP patterns** for complex event detection
-✅ Combine **batch and streaming** with hybrid sources
-✅ Build **reactive microservices** with Quarkus
-✅ Create **real-time data pipelines** end-to-end
+- ✅ Understand **Flink's core concepts**: streams, state, time, windows
+- ✅ Build **stateful stream processing** applications
+- ✅ Integrate **Kafka/Redpanda** for event streaming
+- ✅ Combine **batch and streaming** with hybrid sources
+- ✅ Build **reactive microservices** with Quarkus
+- ✅ Create **real-time data pipelines** end-to-end
 
 ---
 
